@@ -38,7 +38,7 @@ ForgeMate autonomously triages CI failures, reproduces them in ephemeral sandbox
 - Developer chat assistant to refine PRs
 
 ## Demo
-Watch the 2-minute demo: `demo/demo.mp4` (or link to hosted video)
+(https://vimeo.com/1140317960)
 
 ## Quickstart (MVP)
 1. Create a GitHub App with repo access scopes.
