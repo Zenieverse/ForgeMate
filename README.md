@@ -12,6 +12,12 @@ View your app in AI Studio: https://ai.studio/apps/drive/1_y8j-lEQxa7eky_ksAyK_z
 
 **Prerequisites:**  Node.js
 
+[CI Provider Webhook] -> [Orchestrator queue] -> [Repro Sandbox] <-> [LLM Analysis] -> [Patch Synthesizer] -> [PR Builder] -> [Repo]
+                                                          |
+                                                       [Audit Store & Metrics]
+                                                          |
+                                                   [Dashboard & Chat UI]
+
 
 1. Install dependencies:
    `npm install`
