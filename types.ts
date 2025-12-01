@@ -20,6 +20,11 @@ export interface AnalysisResult {
   confidence: number;
   suspectedFile: string;
   evidence: string;
+  recurringPattern?: string;
+  architecturalSuggestion?: string;
+  flakyTestDetected?: boolean;
+  dependencyStatus?: string;
+  regressionRisk?: string;
 }
 
 export interface PatchProposal {
@@ -45,6 +50,23 @@ export interface Job {
 
 export interface AgentConfig {
   autoApproveSafe: boolean;
-  excludedFiles: string[];
-  maxThinkingBudget: number;
+  blockedFilePatterns: string[];
+  requireApprovalFor: {
+      infraChanges: boolean;
+      dependencyUpdates: boolean;
+      largeDiffs: boolean; // > 50 lines
+      deletedFiles: boolean;
+  };
+  sensitivePatterns: string[]; // Regex strings for secret detection
+}
+
+export interface AppSettings {
+  model: string;
+  budget: number;
+  notifications: {
+    slack: boolean;
+    email: boolean;
+    prComments: boolean;
+  };
+  sandboxImage: string;
 }

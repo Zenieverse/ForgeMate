@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { Job, JobStatus } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Plus, Activity, CheckCircle, XCircle, Clock } from 'lucide-react';

@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { LayoutDashboard, GitPullRequest, Settings, Terminal, Activity, ShieldCheck } from 'lucide-react';
 
 interface SidebarProps {

@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import * as React from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import JobDetail from './components/JobDetail';
-import { Job, JobStatus, LogEntry } from './types';
+import Guardrails from './components/Guardrails';
+import Settings from './components/Settings';
+import { Job, JobStatus, LogEntry, AgentConfig, AppSettings } from './types';
 import { Bot, MessageSquare } from 'lucide-react';
 import { chatWithAgent } from './services/geminiService';
 
@@ -26,7 +28,12 @@ const INITIAL_JOBS: Job[] = [
         rootCause: 'Null pointer exception when handling empty API response payload.',
         confidence: 0.95,
         suspectedFile: 'src/services/PaymentService.ts',
-        evidence: 'TypeError: Cannot read properties of undefined (reading "amount")'
+        evidence: 'TypeError: Cannot read properties of undefined (reading "amount")',
+        recurringPattern: 'Detected 2 similar failures in the last 24h. Likely a new API contract change.',
+        architecturalSuggestion: 'Consider using a Zod schema validation layer for all external API responses.',
+        dependencyStatus: 'All critical dependencies up to date.',
+        regressionRisk: 'Low. Change is isolated to the payment adapter.',
+        flakyTestDetected: false
     },
     patch: {
         file: 'src/services/PaymentService.ts',
@@ -37,16 +44,48 @@ const INITIAL_JOBS: Job[] = [
   }
 ];
 
+const INITIAL_CONFIG: AgentConfig = {
+    autoApproveSafe: false,
+    blockedFilePatterns: [
+        '*.tf', 
+        'Dockerfile', 
+        '*.pem', 
+        '.env*', 
+        'k8s/*.yaml', 
+        '.github/workflows/*'
+    ],
+    requireApprovalFor: {
+        infraChanges: true,
+        dependencyUpdates: true,
+        largeDiffs: true,
+        deletedFiles: true
+    },
+    sensitivePatterns: ['AWS_ACCESS_KEY', 'PRIVATE KEY']
+};
+
+const INITIAL_SETTINGS: AppSettings = {
+    model: 'gemini-2.5-flash',
+    budget: 20000,
+    notifications: {
+        slack: true,
+        email: false,
+        prComments: true
+    },
+    sandboxImage: 'node:18-alpine'
+};
+
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState('dashboard');
-  const [jobs, setJobs] = useState<Job[]>(INITIAL_JOBS);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [currentView, setCurrentView] = React.useState('dashboard');
+  const [jobs, setJobs] = React.useState<Job[]>(INITIAL_JOBS);
+  const [selectedJobId, setSelectedJobId] = React.useState<string | null>(null);
+  const [config, setConfig] = React.useState<AgentConfig>(INITIAL_CONFIG);
+  const [settings, setSettings] = React.useState<AppSettings>(INITIAL_SETTINGS);
   
   // Chat State
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatHistory, setChatHistory] = useState<{role: 'user' | 'model', content: string}[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
+  const [isChatOpen, setIsChatOpen] = React.useState(false);
+  const [chatHistory, setChatHistory] = React.useState<{role: 'user' | 'model', content: string}[]>([]);
+  const [chatInput, setChatInput] = React.useState('');
+  const [chatLoading, setChatLoading] = React.useState(false);
 
   const handleSelectJob = (job: Job) => {
     setSelectedJobId(job.id);
@@ -75,6 +114,13 @@ const App: React.FC = () => {
     handleSelectJob(newJob);
   };
 
+  const getActiveJobContext = () => {
+    // If a job is selected, use that.
+    if (selectedJobId) return jobs.find(j => j.id === selectedJobId);
+    // Otherwise try to find an active job, or just the most recent one.
+    return jobs.find(j => j.status !== JobStatus.COMPLETED && j.status !== JobStatus.PR_READY) || jobs[0];
+  };
+
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
@@ -84,7 +130,29 @@ const App: React.FC = () => {
     setChatInput('');
     setChatLoading(true);
 
-    const response = await chatWithAgent(newHistory, chatInput);
+    // Build context string
+    const jobContext = getActiveJobContext();
+    let contextString = "No active job context available.";
+    if (jobContext) {
+        contextString = `
+          Current Job ID: ${jobContext.id}
+          Repository: ${jobContext.repoName}
+          Branch: ${jobContext.branch}
+          Commit: ${jobContext.commitSha}
+          Status: ${jobContext.status}
+          Failure Step: ${jobContext.failureStep}
+          Latest Log Message: ${jobContext.logs[jobContext.logs.length - 1]?.message}
+          Analysis Root Cause: ${jobContext.analysis?.rootCause || 'Not yet analyzed'}
+          Suggested File: ${jobContext.analysis?.suspectedFile || 'N/A'}
+          Recurring Pattern: ${jobContext.analysis?.recurringPattern || 'None'}
+          Architectural Suggestion: ${jobContext.analysis?.architecturalSuggestion || 'None'}
+          Flaky Test Detected: ${jobContext.analysis?.flakyTestDetected ? 'Yes' : 'No'}
+          Dependency Status: ${jobContext.analysis?.dependencyStatus || 'Unknown'}
+          Regression Risk: ${jobContext.analysis?.regressionRisk || 'Unknown'}
+        `;
+    }
+
+    const response = await chatWithAgent(newHistory, chatInput, contextString);
     
     setChatHistory([...newHistory, { role: 'model' as const, content: response }]);
     setChatLoading(false);
@@ -109,20 +177,20 @@ const App: React.FC = () => {
             onBack={() => {
                 setSelectedJobId(null);
                 setCurrentView('dashboard');
-            }} 
+            }}
+            settings={settings}
+            config={config}
           />
         )}
         
         {currentView === 'jobs' && <Dashboard jobs={jobs} onSelectJob={handleSelectJob} onCreateJob={handleCreateJob} />}
         
-        {(currentView === 'settings' || currentView === 'guardrails') && (
-            <div className="flex items-center justify-center h-full text-slate-500">
-                <div className="text-center">
-                    <Bot size={64} className="mx-auto mb-4 opacity-50" />
-                    <h2 className="text-xl font-medium">Coming Soon</h2>
-                    <p>Settings configuration not available in this demo.</p>
-                </div>
-            </div>
+        {currentView === 'guardrails' && (
+            <Guardrails config={config} onUpdateConfig={setConfig} />
+        )}
+
+        {currentView === 'settings' && (
+            <Settings settings={settings} onUpdateSettings={setSettings} />
         )}
       </main>
 
@@ -138,9 +206,10 @@ const App: React.FC = () => {
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-900/50">
                     {chatHistory.length === 0 && (
-                        <p className="text-center text-slate-500 text-sm mt-10">
-                            Ask me about active jobs, logs, or general debugging tips.
-                        </p>
+                        <div className="text-center text-slate-500 text-sm mt-10 space-y-2">
+                             <p>Ask me about active jobs, logs, or general debugging tips.</p>
+                             {selectedJobId && <p className="text-xs text-blue-400">Context: {jobs.find(j => j.id === selectedJobId)?.repoName}</p>}
+                        </div>
                     )}
                     {chatHistory.map((msg, idx) => (
                         <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
