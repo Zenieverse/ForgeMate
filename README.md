@@ -8,8 +8,6 @@ This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/619bced4-f548-4f2b-b871-540bb1b935d2
 
-or https://forgemate-764082783379.us-west1.run.app
-
 ## Run Locally
 
 **Prerequisites:**  Node.js
