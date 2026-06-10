@@ -1,5 +1,6 @@
 {
   "name": "ForgeMate",
   "description": "Autonomous developer agent for CI pipeline monitoring, failure reproduction, and automated patching.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": []
 }
